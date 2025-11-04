@@ -126,31 +126,31 @@ class MCPServer:
         """Register all MCP tools"""
 
         # Core Testing Tools
-        self.mcp.tool()(mcp_tools.test_generate)
-        self.mcp.tool()(mcp_tools.test_execute)
-        self.mcp.tool()(mcp_tools.coverage_analyze)
-        self.mcp.tool()(mcp_tools.quality_gate)
+        self.mcp.tool(mcp_tools.test_generate)
+        self.mcp.tool(mcp_tools.test_execute)
+        self.mcp.tool(mcp_tools.coverage_analyze)
+        self.mcp.tool(mcp_tools.quality_gate)
 
         # Performance & Security
-        self.mcp.tool()(mcp_tools.performance_test)
-        self.mcp.tool()(mcp_tools.security_scan)
+        self.mcp.tool(mcp_tools.performance_test)
+        self.mcp.tool(mcp_tools.security_scan)
 
         # Fleet Orchestration
-        self.mcp.tool()(mcp_tools.fleet_orchestrate)
-        self.mcp.tool()(mcp_tools.get_fleet_status)
+        self.mcp.tool(mcp_tools.fleet_orchestrate)
+        self.mcp.tool(mcp_tools.get_fleet_status)
 
         # Advanced Tools
-        self.mcp.tool()(mcp_tools.requirements_validate)
-        self.mcp.tool()(mcp_tools.flaky_test_hunt)
-        self.mcp.tool()(mcp_tools.api_contract_validate)
-        self.mcp.tool()(mcp_tools.regression_risk_analyze)
-        self.mcp.tool()(mcp_tools.test_data_generate)
-        self.mcp.tool()(mcp_tools.visual_test)
-        self.mcp.tool()(mcp_tools.chaos_test)
-        self.mcp.tool()(mcp_tools.deployment_readiness)
+        self.mcp.tool(mcp_tools.requirements_validate)
+        self.mcp.tool(mcp_tools.flaky_test_hunt)
+        self.mcp.tool(mcp_tools.api_contract_validate)
+        self.mcp.tool(mcp_tools.regression_risk_analyze)
+        self.mcp.tool(mcp_tools.test_data_generate)
+        self.mcp.tool(mcp_tools.visual_test)
+        self.mcp.tool(mcp_tools.chaos_test)
+        self.mcp.tool(mcp_tools.deployment_readiness)
 
         # Streaming tools
-        self.mcp.tool()(mcp_tools.test_execute_stream)
+        self.mcp.tool(mcp_tools.test_execute_stream)
 
         self.logger.info(f"Registered {len(self.mcp._tools)} MCP tools")
 

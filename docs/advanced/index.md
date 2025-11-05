@@ -184,7 +184,7 @@ Intelligent model selection for cost optimization:
 3. Track costs and savings
 4. Fallback on errors
 
-**Result**: 70-81% cost savings
+**Result**: up to 80% theoretical cost savings
 
 ### Q-Learning Integration
 

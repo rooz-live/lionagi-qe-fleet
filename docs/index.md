@@ -1,6 +1,6 @@
 # LionAGI QE Fleet
 
-**Build trustworthy AI-powered quality engineering workflows with 19 specialized agents**
+**Build trustworthy AI-powered quality engineering workflows with 18 specialized agents**
 
 ## The Problem
 
@@ -87,7 +87,7 @@ asyncio.run(main())
 - **Trust through transparency**: See every quality decision, not just pass/fail
 - **Intelligent automation**: AI agents that learn patterns and catch edge cases
 - **Sublinear scaling**: Maintain coverage without linear test growth
-- **Cost optimization**: 70-81% savings through intelligent model routing
+- **Cost optimization**: up to 80% theoretical savings through intelligent model routing
 - **Multi-agent coordination**: Different specialists tackle different quality aspects
 
 ## When to Use LionAGI QE Fleet
@@ -180,7 +180,7 @@ Simple tasks use GPT-3.5 ($0.0004), complex tasks use GPT-4 ($0.0048), critical 
 Johnson-Lindenstrauss dimension reduction and spectral sparsification for O(log n) gap detection
 
 ### Agent Coordination
-19 specialized agents share context through `aqe/*` memory namespace
+18 specialized agents share context through `aqe/*` memory namespace
 
 ### Streaming Progress
 Real-time visibility into long-running operations
@@ -190,11 +190,11 @@ Q-learning integration for continuous improvement
 
 ## Quick Stats
 
-- **19 specialized agents** for comprehensive QE
-- **10,000+ concurrent test** execution capability
-- **70-81% cost savings** through intelligent routing
+- **18 specialized agents** for comprehensive QE
+- **Parallel execution** with async-first architecture
+- **Up to 80% theoretical cost savings** through intelligent routing
 - **O(log n) coverage** analysis algorithms
-- **34 QE skills** integrated into Claude Code
+- **34 QE skills** (Claude Code IDE features for development)
 
 ## Get Started
 

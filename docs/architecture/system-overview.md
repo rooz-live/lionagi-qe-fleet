@@ -9,7 +9,7 @@ This document outlines the architecture for rebuilding the Agentic QE Fleet usin
 ### Advantages
 
 1. **Multi-Provider Support**: Built-in support for OpenAI, Anthropic, Ollama enables intelligent multi-model routing
-2. **Async-First**: Perfect for parallel test execution (10,000+ concurrent tests)
+2. **Async-First**: Perfect for parallel test execution (Parallel async test execution)
 3. **Structured Outputs**: Pydantic validation ensures type-safe agent responses
 4. **Workflow Orchestration**: Builder/Operation graphs for complex QE pipelines
 5. **ReAct Reasoning**: Advanced reasoning for intelligent test generation
@@ -48,7 +48,7 @@ This document outlines the architecture for rebuilding the Agentic QE Fleet usin
 │  - QEMemory (shared namespace)      │
 │  - QEOrchestrator (coordination)    │
 │  - ModelRouter (cost optimization)  │
-│  - SkillRegistry (34 QE skills)     │
+│  - SkillRegistry (34 Claude Code IDE skills)     │
 └─────────────────────────────────────┘
 ```
 
@@ -505,9 +505,9 @@ aqe/
 
 ## Success Metrics
 
-- **Coverage**: Maintain 19 specialized agents
-- **Performance**: 10,000+ concurrent test execution
-- **Cost**: 70-81% savings through model routing
+- **Coverage**: Maintain 18 specialized agents
+- **Performance**: Parallel test execution capability
+- **Cost**: up to 80% theoretical savings through model routing
 - **Quality**: 85%+ pattern matching accuracy
 - **Reliability**: 100% flaky test detection accuracy
 

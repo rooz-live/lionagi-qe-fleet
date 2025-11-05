@@ -161,7 +161,7 @@
 
 | **Status** | ✅ **FULLY IMPLEMENTED** |
 |------------|--------------------------|
-| **Claimed** | 70-81% cost savings claim |
+| **Claimed** | up to 80% theoretical cost savings claim |
 | **Actual** | Complete routing implementation with cost tracking |
 
 **Evidence**:

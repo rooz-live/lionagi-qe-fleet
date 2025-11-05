@@ -74,7 +74,7 @@ coverage = await analyze_coverage(prev_results)
 **What**: Strategies to minimize AI API costs
 
 **Key Topics**:
-- Multi-model routing (70-81% savings)
+- Multi-model routing (up to 80% theoretical savings)
 - Model selection strategies
 - Cost monitoring and tracking
 - Usage optimization

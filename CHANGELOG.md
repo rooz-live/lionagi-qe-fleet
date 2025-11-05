@@ -5,6 +5,17 @@ All notable changes to the LionAGI QE Fleet project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-11-05
+
+### Fixed
+- **pyproject.toml Configuration**: Moved dependencies array from incorrect [project.urls] section to correct [project] section
+- **Documentation Links**: Updated all broken documentation links in README.md to reflect new docs structure
+  - Fixed paths for quickstart, guides, advanced features, and reports
+  - Added links to installation guide, troubleshooting, and agent catalog
+  - Updated FAQ link to point to troubleshooting guide
+
+This patch release fixes the PyPI publication build error and ensures all documentation is accessible.
+
 ## [1.0.0] - 2025-11-05
 
 ### Added

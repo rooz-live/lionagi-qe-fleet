@@ -5,6 +5,20 @@ All notable changes to the LionAGI QE Fleet project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-11-05
+
+### Fixed
+- **Documentation Accuracy**: Corrected false claims across all user-facing documentation
+  - Agent count: 19 → 18 specialized agents (verified actual agent files in src/lionagi_qe/agents/)
+  - Cost savings: Added "theoretical" disclaimer (70-81% → up to 80% theoretical cost savings)
+  - Concurrent testing: Removed unverified "10,000+" claim → "Parallel async execution"
+  - Q-Learning: Clarified as "Execution Tracking" foundation (no learning algorithm implemented yet)
+  - 34 QE Skills: Clarified as Claude Code IDE features (not included in pip package)
+- **Files corrected**: README.md + 16 documentation files across docs/ directory
+- **New documentation**: Added comprehensive verification report at docs/reports/README_CLAIMS_VERIFICATION.md (340 lines)
+
+This release ensures honest, accurate documentation that matches actual implementation. All claims are now evidence-based and verifiable in the codebase.
+
 ## [1.0.1] - 2025-11-05
 
 ### Fixed

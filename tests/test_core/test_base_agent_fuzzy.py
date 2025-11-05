@@ -619,3 +619,269 @@ class TestLogging:
 
                     assert "attempting fuzzy parsing fallback" in caplog.text
                     assert "Fuzzy parsing successful" in caplog.text
+
+
+class TestSafeCommunicateFallback:
+    """Test safe_operate fallback path via communicate method"""
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_standard_parsing_fails(self, qe_memory, simple_model, mocker):
+        """Test fallback when standard operate parsing fails"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # Standard parsing fails
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=ValueError("Validation error: invalid JSON structure")
+        )
+
+        # Fallback communicate succeeds
+        raw_response = '{"test_name": "fallback_test", "test_count": 5, "success_rate": 0.75}'
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            new=AsyncMock(return_value=raw_response)
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json') as mock_fuzzy:
+                with patch('lionagi_qe.core.base_agent.fuzzy_validate_pydantic') as mock_validate:
+                    mock_fuzzy.return_value = {
+                        "test_name": "fallback_test",
+                        "test_count": 5,
+                        "success_rate": 0.75
+                    }
+                    mock_validate.return_value = SimpleTestModel(
+                        test_name="fallback_test",
+                        test_count=5,
+                        success_rate=0.75
+                    )
+
+                    result = await agent.safe_operate(
+                        instruction="Generate test data",
+                        response_format=SimpleTestModel
+                    )
+
+                    # Verify fallback was used
+                    assert result.test_name == "fallback_test"
+                    assert agent.branch.communicate.called
+                    assert mock_fuzzy.called
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_fuzzy_fallback_succeeds(self, qe_memory, simple_model, mocker):
+        """Test fuzzy parsing successfully recovers from standard parse failure"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # Standard parsing fails
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=Exception("Pydantic validation error")
+        )
+
+        # Communicate returns messy response
+        messy_response = '''
+        Here's your test data:
+        {
+            "test_name": "fuzzy_recovery",
+            "test_count": 15,
+            "success_rate": 0.92
+        }
+        I hope this helps!
+        '''
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            new=AsyncMock(return_value=messy_response)
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json') as mock_fuzzy:
+                with patch('lionagi_qe.core.base_agent.fuzzy_validate_pydantic') as mock_validate:
+                    # Fuzzy parsing extracts clean JSON
+                    mock_fuzzy.return_value = {
+                        "test_name": "fuzzy_recovery",
+                        "test_count": 15,
+                        "success_rate": 0.92
+                    }
+                    mock_validate.return_value = SimpleTestModel(
+                        test_name="fuzzy_recovery",
+                        test_count=15,
+                        success_rate=0.92
+                    )
+
+                    result = await agent.safe_operate(
+                        instruction="Generate messy data",
+                        response_format=SimpleTestModel
+                    )
+
+                    assert result.test_name == "fuzzy_recovery"
+                    assert result.test_count == 15
+                    mock_fuzzy.assert_called_once_with(messy_response)
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_malformed_json_handling(self, qe_memory, simple_model, mocker):
+        """Test handling of severely malformed JSON in fallback path"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # Standard parsing fails
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=ValueError("JSON decode error")
+        )
+
+        # Communicate returns malformed JSON
+        malformed_json = '''
+        {"test_name": "broken_test",
+         "test_count": 10,
+         "success_rate": 0.85
+         // Missing closing brace and has comment
+        '''
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            new=AsyncMock(return_value=malformed_json)
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json') as mock_fuzzy:
+                with patch('lionagi_qe.core.base_agent.fuzzy_validate_pydantic') as mock_validate:
+                    # Fuzzy parser fixes malformed JSON
+                    mock_fuzzy.return_value = {
+                        "test_name": "broken_test",
+                        "test_count": 10,
+                        "success_rate": 0.85
+                    }
+                    mock_validate.return_value = SimpleTestModel(
+                        test_name="broken_test",
+                        test_count=10,
+                        success_rate=0.85
+                    )
+
+                    result = await agent.safe_operate(
+                        instruction="Generate data",
+                        response_format=SimpleTestModel
+                    )
+
+                    assert result.test_name == "broken_test"
+                    # Fuzzy JSON should have been called to clean it
+                    mock_fuzzy.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_empty_response(self, qe_memory, simple_model, mocker):
+        """Test handling of empty response in fallback path"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # Standard parsing fails
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=Exception("Empty response")
+        )
+
+        # Communicate returns empty string
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            new=AsyncMock(return_value="")
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json', side_effect=ValueError("Empty JSON")):
+                with pytest.raises(ValueError, match="Empty JSON"):
+                    await agent.safe_operate(
+                        instruction="Generate data",
+                        response_format=SimpleTestModel
+                    )
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_nested_parse_errors(self, qe_memory, simple_model, mocker):
+        """Test multiple levels of parse errors in fallback path"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # Standard parsing fails
+        standard_error = ValueError("Pydantic validation failed: missing required fields")
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=standard_error
+        )
+
+        # Communicate returns something
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            new=AsyncMock(return_value='{"incomplete": "data"}')
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json') as mock_fuzzy:
+                # Fuzzy JSON succeeds but fuzzy validation fails
+                mock_fuzzy.return_value = {"incomplete": "data"}
+
+                with patch('lionagi_qe.core.base_agent.fuzzy_validate_pydantic') as mock_validate:
+                    fuzzy_error = ValueError("Fuzzy validation failed: missing test_name")
+                    mock_validate.side_effect = fuzzy_error
+
+                    with pytest.raises(ValueError) as exc_info:
+                        await agent.safe_operate(
+                            instruction="Generate data",
+                            response_format=SimpleTestModel
+                        )
+
+                    # Error message should mention both failures
+                    error_msg = str(exc_info.value)
+                    assert "Standard parsing error" in error_msg
+                    assert "Fuzzy parsing error" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_safe_communicate_retry_logic(self, qe_memory, simple_model, mocker):
+        """Test that fallback path is attempted after standard parsing fails"""
+        agent = MockAgent("test-agent", simple_model, qe_memory)
+
+        # First attempt: standard parsing fails
+        mocker.patch.object(
+            agent.branch,
+            'operate',
+            side_effect=Exception("Structured output parsing failed")
+        )
+
+        # Second attempt: fallback to communicate
+        call_count = {"count": 0}
+
+        async def mock_communicate_with_count(*args, **kwargs):
+            call_count["count"] += 1
+            return '{"test_name": "retry_test", "test_count": 3, "success_rate": 0.8}'
+
+        mocker.patch.object(
+            agent.branch,
+            'communicate',
+            side_effect=mock_communicate_with_count
+        )
+
+        with patch('lionagi_qe.core.base_agent.FUZZY_PARSING_AVAILABLE', True):
+            with patch('lionagi_qe.core.base_agent.fuzzy_json') as mock_fuzzy:
+                with patch('lionagi_qe.core.base_agent.fuzzy_validate_pydantic') as mock_validate:
+                    mock_fuzzy.return_value = {
+                        "test_name": "retry_test",
+                        "test_count": 3,
+                        "success_rate": 0.8
+                    }
+                    mock_validate.return_value = SimpleTestModel(
+                        test_name="retry_test",
+                        test_count=3,
+                        success_rate=0.8
+                    )
+
+                    result = await agent.safe_operate(
+                        instruction="Generate with retry",
+                        response_format=SimpleTestModel
+                    )
+
+                    # Verify fallback was attempted exactly once
+                    assert call_count["count"] == 1
+                    assert result.test_name == "retry_test"
+                    # Standard operate should have been tried first
+                    agent.branch.operate.assert_called_once()

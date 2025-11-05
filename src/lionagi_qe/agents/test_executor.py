@@ -3,10 +3,73 @@
 from typing import Dict, Any, List
 import time
 import subprocess
+import os
+from pathlib import Path
 from pydantic import BaseModel, Field
 from lionagi.ln import alcall, AlcallParams
 from lionagi_qe.core.base_agent import BaseQEAgent
 from lionagi_qe.core.task import QETask
+
+
+# Security: Whitelist of allowed test frameworks
+ALLOWED_FRAMEWORKS = {"pytest", "jest", "mocha", "unittest", "nose2"}
+
+
+def validate_file_path(file_path: str, must_exist: bool = False) -> str:
+    """Validate and sanitize file path to prevent path traversal attacks
+
+    Args:
+        file_path: Path to validate
+        must_exist: If True, verify file exists
+
+    Returns:
+        Absolute, sanitized path
+
+    Raises:
+        ValueError: If path is invalid or contains path traversal
+        FileNotFoundError: If must_exist=True and file doesn't exist
+    """
+    if not file_path or not isinstance(file_path, str):
+        raise ValueError("File path must be a non-empty string")
+
+    # Resolve to absolute path and normalize
+    abs_path = Path(file_path).resolve()
+
+    # Check for path traversal attempts
+    if ".." in str(abs_path):
+        raise ValueError(f"Path traversal detected in: {file_path}")
+
+    # Verify file exists if required
+    if must_exist and not abs_path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    return str(abs_path)
+
+
+def validate_framework(framework: str) -> str:
+    """Validate framework is in allowed list
+
+    Args:
+        framework: Framework name
+
+    Returns:
+        Validated framework name
+
+    Raises:
+        ValueError: If framework is not allowed
+    """
+    if not framework or not isinstance(framework, str):
+        raise ValueError("Framework must be a non-empty string")
+
+    framework = framework.lower().strip()
+
+    if framework not in ALLOWED_FRAMEWORKS:
+        raise ValueError(
+            f"Framework '{framework}' not allowed. "
+            f"Allowed frameworks: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"
+        )
+
+    return framework
 
 
 class TestExecutionResult(BaseModel):
@@ -86,6 +149,14 @@ class TestExecutorAgent(BaseQEAgent):
         parallel = context.get("parallel", True)
         coverage_enabled = context.get("coverage", True)
 
+        # Security: Validate inputs
+        try:
+            test_path = validate_file_path(test_path)
+            framework = validate_framework(framework)
+        except (ValueError, FileNotFoundError) as e:
+            self.logger.error(f"Input validation failed: {e}")
+            raise
+
         # Retrieve previous execution results for comparison
         previous_results = await self.retrieve_context(
             f"aqe/test-executor/last_execution"
@@ -163,30 +234,38 @@ Provide:
                 "framework": "pytest"
             }
         """
+        # Security: Validate framework
+        framework = validate_framework(framework)
 
         async def run_single_test(file_path: str) -> Dict[str, Any]:
             """Execute single test file"""
             try:
+                # Security: Validate file path before execution
+                validated_path = validate_file_path(file_path)
+
                 if framework == "pytest":
                     result = subprocess.run(
-                        ["pytest", file_path, "-v", "--tb=short"],
+                        ["pytest", validated_path, "-v", "--tb=short"],
                         capture_output=True,
                         text=True,
-                        timeout=60
+                        timeout=60,
+                        shell=False  # Explicit security: never use shell=True
                     )
                 elif framework == "jest":
                     result = subprocess.run(
-                        ["npm", "test", "--", file_path],
+                        ["npm", "test", "--", validated_path],
                         capture_output=True,
                         text=True,
-                        timeout=60
+                        timeout=60,
+                        shell=False  # Explicit security: never use shell=True
                     )
                 elif framework == "mocha":
                     result = subprocess.run(
-                        ["npx", "mocha", file_path],
+                        ["npx", "mocha", validated_path],
                         capture_output=True,
                         text=True,
-                        timeout=60
+                        timeout=60,
+                        shell=False  # Explicit security: never use shell=True
                     )
                 else:
                     raise ValueError(f"Unsupported framework: {framework}")

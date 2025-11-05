@@ -51,12 +51,40 @@ class CodeAnalyzerTool:
             >>> print(result['functions'])
             [{'name': 'add', 'args': ['a', 'b'], 'returns': True, ...}]
         """
-        # Get code content
+        # Load and validate code content (CC=3)
+        code = CodeAnalyzerTool._load_code_content(file_path, code_content)
+        if isinstance(code, dict):  # Error response
+            return code
+
+        # Parse code into AST (CC=2)
+        tree = CodeAnalyzerTool._parse_code_to_ast(code)
+        if isinstance(tree, dict):  # Error response
+            return tree
+
+        # Extract all code components (CC=1)
+        functions, classes, dependencies, complexity = CodeAnalyzerTool._extract_code_components(tree)
+
+        # Build final result dictionary (CC=1)
+        return CodeAnalyzerTool._build_analysis_result(
+            functions, classes, dependencies, complexity, code
+        )
+
+    @staticmethod
+    def _load_code_content(file_path: Optional[str], code_content: Optional[str]) -> Any:
+        """Load code content from file or use provided content
+
+        Args:
+            file_path: Path to Python file
+            code_content: Raw Python code
+
+        Returns:
+            Code string or error dictionary
+        """
         if file_path and os.path.exists(file_path):
             with open(file_path, 'r') as f:
-                code = f.read()
+                return f.read()
         elif code_content:
-            code = code_content
+            return code_content
         else:
             return {
                 "error": "Must provide either file_path or code_content",
@@ -67,8 +95,18 @@ class CodeAnalyzerTool:
                 "lines_of_code": 0
             }
 
+    @staticmethod
+    def _parse_code_to_ast(code: str) -> Any:
+        """Parse Python code into AST
+
+        Args:
+            code: Python source code
+
+        Returns:
+            AST tree or error dictionary
+        """
         try:
-            tree = ast.parse(code)
+            return ast.parse(code)
         except SyntaxError as e:
             return {
                 "error": f"Syntax error in code: {str(e)}",
@@ -79,63 +117,134 @@ class CodeAnalyzerTool:
                 "lines_of_code": len(code.split('\n'))
             }
 
+    @staticmethod
+    def _extract_code_components(tree: ast.AST) -> tuple:
+        """Extract functions, classes, dependencies, and complexity from AST
+
+        Args:
+            tree: Parsed AST tree
+
+        Returns:
+            Tuple of (functions, classes, dependencies, complexity)
+        """
         functions = []
         classes = []
         dependencies = []
         complexity = {}
 
-        # Extract functions
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                func_info = {
-                    "name": node.name,
-                    "args": [arg.arg for arg in node.args.args],
-                    "defaults": len(node.args.defaults),
-                    "returns": node.returns is not None,
-                    "is_async": isinstance(node, ast.AsyncFunctionDef),
-                    "decorators": [d.id if isinstance(d, ast.Name) else str(d) for d in node.decorator_list],
-                    "docstring": ast.get_docstring(node),
-                    "line_number": node.lineno,
-                    "num_statements": len(node.body)
-                }
-
-                # Simple complexity estimate (number of branches)
-                num_branches = sum(1 for n in ast.walk(node) if isinstance(n, (ast.If, ast.While, ast.For, ast.ExceptHandler)))
-                complexity[node.name] = num_branches + 1
-
+                # Extract function information (CC=1)
+                func_info, func_complexity = CodeAnalyzerTool._extract_function_info(node)
                 functions.append(func_info)
+                complexity[node.name] = func_complexity
 
-            # Extract classes
             elif isinstance(node, ast.ClassDef):
-                methods = []
-                for item in node.body:
-                    if isinstance(item, ast.FunctionDef):
-                        methods.append({
-                            "name": item.name,
-                            "args": [arg.arg for arg in item.args.args],
-                            "is_property": any(d.id == 'property' if isinstance(d, ast.Name) else False for d in item.decorator_list),
-                            "is_staticmethod": any(d.id == 'staticmethod' if isinstance(d, ast.Name) else False for d in item.decorator_list),
-                            "is_classmethod": any(d.id == 'classmethod' if isinstance(d, ast.Name) else False for d in item.decorator_list),
-                        })
-
-                class_info = {
-                    "name": node.name,
-                    "bases": [base.id if isinstance(base, ast.Name) else str(base) for base in node.bases],
-                    "methods": methods,
-                    "decorators": [d.id if isinstance(d, ast.Name) else str(d) for d in node.decorator_list],
-                    "docstring": ast.get_docstring(node),
-                    "line_number": node.lineno
-                }
+                # Extract class information (CC=1)
+                class_info = CodeAnalyzerTool._extract_class_info(node)
                 classes.append(class_info)
 
-            # Extract imports
             elif isinstance(node, ast.Import):
+                # Extract import statements (CC=1)
                 for alias in node.names:
                     dependencies.append(alias.name)
+
             elif isinstance(node, ast.ImportFrom):
+                # Extract from-import statements (CC=1)
                 if node.module:
                     dependencies.append(node.module)
 
+        return functions, classes, dependencies, complexity
+
+    @staticmethod
+    def _extract_function_info(node: ast.FunctionDef) -> tuple:
+        """Extract detailed information from function node
+
+        Args:
+            node: AST FunctionDef node
+
+        Returns:
+            Tuple of (function_info_dict, complexity_score)
+        """
+        func_info = {
+            "name": node.name,
+            "args": [arg.arg for arg in node.args.args],
+            "defaults": len(node.args.defaults),
+            "returns": node.returns is not None,
+            "is_async": isinstance(node, ast.AsyncFunctionDef),
+            "decorators": [d.id if isinstance(d, ast.Name) else str(d) for d in node.decorator_list],
+            "docstring": ast.get_docstring(node),
+            "line_number": node.lineno,
+            "num_statements": len(node.body)
+        }
+
+        # Calculate complexity (number of branches + 1)
+        num_branches = sum(
+            1 for n in ast.walk(node)
+            if isinstance(n, (ast.If, ast.While, ast.For, ast.ExceptHandler))
+        )
+        complexity_score = num_branches + 1
+
+        return func_info, complexity_score
+
+    @staticmethod
+    def _extract_class_info(node: ast.ClassDef) -> Dict[str, Any]:
+        """Extract detailed information from class node
+
+        Args:
+            node: AST ClassDef node
+
+        Returns:
+            Dictionary with class information
+        """
+        methods = []
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef):
+                methods.append({
+                    "name": item.name,
+                    "args": [arg.arg for arg in item.args.args],
+                    "is_property": any(
+                        d.id == 'property' if isinstance(d, ast.Name) else False
+                        for d in item.decorator_list
+                    ),
+                    "is_staticmethod": any(
+                        d.id == 'staticmethod' if isinstance(d, ast.Name) else False
+                        for d in item.decorator_list
+                    ),
+                    "is_classmethod": any(
+                        d.id == 'classmethod' if isinstance(d, ast.Name) else False
+                        for d in item.decorator_list
+                    ),
+                })
+
+        class_info = {
+            "name": node.name,
+            "bases": [base.id if isinstance(base, ast.Name) else str(base) for base in node.bases],
+            "methods": methods,
+            "decorators": [d.id if isinstance(d, ast.Name) else str(d) for d in node.decorator_list],
+            "docstring": ast.get_docstring(node),
+            "line_number": node.lineno
+        }
+
+        return class_info
+
+    @staticmethod
+    def _build_analysis_result(
+        functions: List[Dict], classes: List[Dict],
+        dependencies: List[str], complexity: Dict[str, int], code: str
+    ) -> Dict[str, Any]:
+        """Build final analysis result dictionary
+
+        Args:
+            functions: List of extracted functions
+            classes: List of extracted classes
+            dependencies: List of dependencies
+            complexity: Complexity metrics
+            code: Original source code
+
+        Returns:
+            Complete analysis result dictionary
+        """
         return {
             "functions": functions,
             "classes": classes,

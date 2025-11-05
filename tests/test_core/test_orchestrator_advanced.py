@@ -676,3 +676,487 @@ class TestContextInheritance:
             assert results[0]["id"] == 1
             assert results[1]["id"] == 2
             assert results[2]["id"] == 3
+
+
+class TestExecuteConditionalWorkflow:
+    """Test execute_conditional_workflow() with branching logic"""
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_branch_high(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow takes high coverage branch"""
+        # Setup agents
+        analyzer = MockQEAgent("coverage-analyzer", simple_model, qe_memory)
+        quality_gate = MockQEAgent("quality-gate", simple_model, qe_memory)
+        test_generator = MockQEAgent("test-generator", simple_model, qe_memory)
+
+        qe_orchestrator.register_agent(analyzer)
+        qe_orchestrator.register_agent(quality_gate)
+        qe_orchestrator.register_agent(test_generator)
+
+        # Mock initial operation to return high coverage
+        mock_op_id = "initial_op_123"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"coverage_percent": 85.0, "status": "success"}
+            })
+        )
+
+        # Mock builder operations
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            # Mock execute_pipeline for branch execution
+            mocker.patch.object(
+                qe_orchestrator,
+                'execute_pipeline',
+                new=AsyncMock(return_value={"quality_gate_result": "passed"})
+            )
+
+            result = await qe_orchestrator.execute_conditional_workflow(
+                agent_id="coverage-analyzer",
+                task={"code_path": "./src", "instruction": "Analyze coverage"},
+                decision_key="coverage_percent",
+                branches={
+                    "high": ["quality-gate"],
+                    "low": ["test-generator"]
+                },
+                decision_fn=lambda cov: "high" if cov >= 80 else "low"
+            )
+
+            # Assert
+            assert result["branch_taken"] == "high"
+            assert result["decision_value"] == 85.0
+            assert result["branch_results"] is not None
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_branch_low(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow takes low coverage branch"""
+        # Setup agents
+        analyzer = MockQEAgent("coverage-analyzer", simple_model, qe_memory)
+        test_generator = MockQEAgent("test-generator", simple_model, qe_memory)
+
+        qe_orchestrator.register_agent(analyzer)
+        qe_orchestrator.register_agent(test_generator)
+
+        # Mock initial operation to return low coverage
+        mock_op_id = "initial_op_456"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"coverage_percent": 65.0, "status": "needs_improvement"}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            mocker.patch.object(
+                qe_orchestrator,
+                'execute_pipeline',
+                new=AsyncMock(return_value={"tests_generated": 25})
+            )
+
+            result = await qe_orchestrator.execute_conditional_workflow(
+                agent_id="coverage-analyzer",
+                task={"code_path": "./src"},
+                decision_key="coverage_percent",
+                branches={
+                    "high": ["quality-gate"],
+                    "low": ["test-generator"]
+                },
+                decision_fn=lambda cov: "high" if cov >= 80 else "low"
+            )
+
+            assert result["branch_taken"] == "low"
+            assert result["decision_value"] == 65.0
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_custom_decision_fn(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow with custom decision function"""
+        agent = MockQEAgent("security-scanner", simple_model, qe_memory)
+        remediation = MockQEAgent("remediation-agent", simple_model, qe_memory)
+
+        qe_orchestrator.register_agent(agent)
+        qe_orchestrator.register_agent(remediation)
+
+        mock_op_id = "sec_op_789"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"severity": "high", "vulnerabilities": 3}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            mocker.patch.object(
+                qe_orchestrator,
+                'execute_pipeline',
+                new=AsyncMock(return_value={"remediation_applied": True})
+            )
+
+            # Custom decision function based on severity
+            def severity_decision(severity):
+                if severity == "critical":
+                    return "immediate"
+                elif severity == "high":
+                    return "urgent"
+                else:
+                    return "normal"
+
+            result = await qe_orchestrator.execute_conditional_workflow(
+                agent_id="security-scanner",
+                task={"scan_path": "./src"},
+                decision_key="severity",
+                branches={
+                    "immediate": ["remediation-agent"],
+                    "urgent": ["remediation-agent"],
+                    "normal": []
+                },
+                decision_fn=severity_decision
+            )
+
+            assert result["branch_taken"] == "urgent"
+            assert result["decision_value"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_missing_branch(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow raises error when no matching branch"""
+        agent = MockQEAgent("analyzer", simple_model, qe_memory)
+        qe_orchestrator.register_agent(agent)
+
+        mock_op_id = "missing_branch_op"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"status": "unknown_status"}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            # No decision_fn provided and no matching branch
+            with pytest.raises(ValueError, match="No matching branch"):
+                await qe_orchestrator.execute_conditional_workflow(
+                    agent_id="analyzer",
+                    task={"data": "test"},
+                    decision_key="status",
+                    branches={
+                        "success": ["agent1"],
+                        "failure": ["agent2"]
+                    }
+                    # No decision_fn, will try default matching
+                )
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_invalid_decision_key(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow handles missing decision key gracefully"""
+        agent = MockQEAgent("analyzer", simple_model, qe_memory)
+        qe_orchestrator.register_agent(agent)
+
+        mock_op_id = "invalid_key_op"
+        # Result doesn't contain the decision_key
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"other_field": "value"}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            # Should handle None gracefully with decision_fn
+            result = await qe_orchestrator.execute_conditional_workflow(
+                agent_id="analyzer",
+                task={"data": "test"},
+                decision_key="missing_key",  # This key doesn't exist
+                branches={
+                    "default": [],
+                    "other": []
+                },
+                decision_fn=lambda x: "default"  # Function handles None
+            )
+
+            assert result["branch_taken"] == "default"
+            assert result["decision_value"] is None
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_decision_fn_error(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow handles decision function errors"""
+        agent = MockQEAgent("analyzer", simple_model, qe_memory)
+        qe_orchestrator.register_agent(agent)
+
+        mock_op_id = "error_op"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"value": 42}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            # Decision function that raises error
+            def bad_decision_fn(value):
+                raise RuntimeError("Decision function failed")
+
+            with pytest.raises(RuntimeError, match="Decision function failed"):
+                await qe_orchestrator.execute_conditional_workflow(
+                    agent_id="analyzer",
+                    task={"data": "test"},
+                    decision_key="value",
+                    branches={
+                        "branch1": [],
+                        "branch2": []
+                    },
+                    decision_fn=bad_decision_fn
+                )
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_branch_execution_error(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow handles branch execution errors"""
+        agent = MockQEAgent("analyzer", simple_model, qe_memory)
+        qe_orchestrator.register_agent(agent)
+
+        mock_op_id = "branch_error_op"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"result": "proceed"}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            # Mock execute_pipeline to fail
+            mocker.patch.object(
+                qe_orchestrator,
+                'execute_pipeline',
+                new=AsyncMock(side_effect=RuntimeError("Branch execution failed"))
+            )
+
+            with pytest.raises(RuntimeError, match="Branch execution failed"):
+                await qe_orchestrator.execute_conditional_workflow(
+                    agent_id="analyzer",
+                    task={"data": "test"},
+                    decision_key="result",
+                    branches={
+                        "proceed": ["failing-agent"],
+                        "abort": []
+                    },
+                    decision_fn=lambda x: x
+                )
+
+    @pytest.mark.asyncio
+    async def test_conditional_workflow_empty_branches(self, qe_orchestrator, qe_memory, simple_model, mocker):
+        """Test conditional workflow with empty branch (no agents to execute)"""
+        agent = MockQEAgent("analyzer", simple_model, qe_memory)
+        qe_orchestrator.register_agent(agent)
+
+        mock_op_id = "empty_branch_op"
+        mocker.patch.object(
+            qe_orchestrator.session,
+            'flow',
+            new=AsyncMock(return_value={
+                mock_op_id: {"status": "skip"}
+            })
+        )
+
+        with patch('lionagi_qe.core.orchestrator.Builder') as mock_builder_class:
+            mock_builder = MagicMock()
+            mock_builder_class.return_value = mock_builder
+
+            mock_initial_op = MagicMock()
+            mock_initial_op.id = mock_op_id
+            mock_builder.add_operation.return_value = mock_initial_op
+            mock_builder.get_graph.return_value = MagicMock()
+
+            result = await qe_orchestrator.execute_conditional_workflow(
+                agent_id="analyzer",
+                task={"data": "test"},
+                decision_key="status",
+                branches={
+                    "skip": [],  # Empty branch
+                    "process": ["some-agent"]
+                },
+                decision_fn=lambda x: x
+            )
+
+            # Empty branch should return None for branch_results
+            assert result["branch_taken"] == "skip"
+            assert result["branch_results"] is None
+            # Metrics should still increment
+            assert qe_orchestrator.metrics["conditional_workflows"] > 0
+
+
+class TestLearnFromExecution:
+    """Test _learn_from_execution Q-learning integration"""
+
+    @pytest.mark.asyncio
+    async def test_learn_from_execution_success(self, qe_memory, simple_model):
+        """Test learning from successful execution"""
+        agent = MockQEAgent("learner", simple_model, qe_memory, enable_learning=True)
+
+        task = QETask(
+            task_type="test_generation",
+            context={"code": "def add(a, b): return a + b"}
+        )
+
+        result = {
+            "tests_generated": 5,
+            "coverage": 90.0,
+            "quality_score": 8.5
+        }
+
+        # Enable learning and execute
+        await agent._learn_from_execution(task, result)
+
+        # Verify trajectory stored in memory
+        stored = await agent.retrieve_context(f"aqe/{agent.agent_id}/learning/trajectories/{task.task_id}")
+        assert stored is not None
+        assert stored["success"] is True
+        assert stored["result"] == result
+
+    @pytest.mark.asyncio
+    async def test_learn_from_execution_failure(self, qe_memory, simple_model):
+        """Test learning from failed execution"""
+        agent = MockQEAgent("learner", simple_model, qe_memory, enable_learning=True)
+
+        task = QETask(
+            task_type="test_execution",
+            context={"test_file": "test_broken.py"}
+        )
+
+        # Simulate failure by storing error
+        error = ValueError("Test execution failed")
+        await agent.error_handler(task, error)
+
+        # Verify error stored
+        stored = await agent.retrieve_context(f"aqe/{agent.agent_id}/tasks/{task.task_id}/error")
+        assert stored is not None
+        assert "error" in stored
+        assert stored["error"] == "Test execution failed"
+
+    @pytest.mark.asyncio
+    async def test_learn_from_execution_rewards_calculated(self, qe_memory, simple_model):
+        """Test that rewards are implicitly calculated from results"""
+        agent = MockQEAgent("learner", simple_model, qe_memory, enable_learning=True)
+
+        task = QETask(
+            task_type="coverage_analysis",
+            context={"module": "user_service"}
+        )
+
+        # High quality result should lead to positive learning
+        result = {
+            "coverage_percent": 95.0,
+            "gaps_found": 2,
+            "quality": "excellent"
+        }
+
+        await agent._learn_from_execution(task, result)
+
+        # Trajectory should be stored
+        stored = await agent.retrieve_context(f"aqe/{agent.agent_id}/learning/trajectories/{task.task_id}")
+        assert stored["result"]["coverage_percent"] == 95.0
+
+    @pytest.mark.asyncio
+    async def test_learn_from_execution_state_updated(self, qe_memory, simple_model):
+        """Test that agent state is updated through learning"""
+        agent = MockQEAgent("learner", simple_model, qe_memory, enable_learning=True)
+
+        # Execute multiple tasks to build learning history
+        for i in range(3):
+            task = QETask(
+                task_type="test_generation",
+                context={"iteration": i}
+            )
+
+            result = {"tests": i + 1, "quality": 80 + i * 5}
+            await agent._learn_from_execution(task, result)
+
+        # Check that multiple trajectories exist in memory
+        pattern = f"aqe/{agent.agent_id}/learning/trajectories/.*"
+        trajectories = await agent.search_memory(pattern)
+
+        # Should have 3 trajectories
+        assert len(trajectories) >= 3
+
+    @pytest.mark.asyncio
+    async def test_learn_from_execution_disabled(self, qe_memory, simple_model):
+        """Test that learning doesn't occur when disabled"""
+        agent = MockQEAgent("no-learner", simple_model, qe_memory, enable_learning=False)
+
+        task = QETask(
+            task_type="test_generation",
+            context={"code": "def test(): pass"}
+        )
+
+        result = {"tests": 1}
+
+        # Call post_execution_hook which checks enable_learning
+        await agent.post_execution_hook(task, result)
+
+        # Trajectory should not be stored since learning is disabled
+        # Only task result should be stored, not learning trajectory
+        task_result = await agent.retrieve_context(f"aqe/{agent.agent_id}/tasks/{task.task_id}/result")
+        assert task_result is not None
+
+        # Learning trajectory should not exist
+        trajectory = await agent.retrieve_context(f"aqe/{agent.agent_id}/learning/trajectories/{task.task_id}")
+        assert trajectory is None

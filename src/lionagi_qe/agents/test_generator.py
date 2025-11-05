@@ -510,6 +510,68 @@ Generate tests one at a time, each as a complete GeneratedTest object in JSON fo
             Step 9 (Think): "All critical paths covered, ready to generate tests"
             Step 10 (Final): Generate complete test suite with all scenarios and edge cases
         """
+        try:
+            # Validate and prepare task context (CC=3, 20 lines)
+            validated_task = await self._validate_and_prepare_task(task)
+
+            # Initialize ReAct tools and context (CC=2, 15 lines)
+            tools, react_context, instruction = await self._initialize_react_components(
+                validated_task, max_reasoning_steps
+            )
+
+            # Execute ReAct reasoning loop (CC=2, 10 lines)
+            result = await self._execute_react_reasoning(
+                instruction, react_context, tools, max_reasoning_steps, verbose
+            )
+
+            # Parse intermediate deliverables from trace (CC=4, 35 lines)
+            parsed_results = await self._parse_reasoning_trace(result)
+
+            # Calculate quality improvement metrics (CC=2, 15 lines)
+            quality_improvement = self._calculate_quality_improvement(
+                parsed_results["scenarios"], parsed_results["edge_cases"]
+            )
+
+            # Ensure final_tests is valid GeneratedTest (CC=3, 20 lines)
+            final_tests = await self._ensure_valid_test_result(
+                result, parsed_results, validated_task
+            )
+
+            # Store results and patterns in memory (CC=3, 25 lines)
+            await self._store_reasoning_results(
+                task, final_tests, parsed_results, quality_improvement, validated_task
+            )
+
+            # Log results if verbose (CC=1, 10 lines)
+            if verbose:
+                self._log_reasoning_results(parsed_results, quality_improvement)
+
+            return {
+                "final_tests": final_tests,
+                "scenarios_identified": parsed_results["scenarios"],
+                "edge_cases_identified": parsed_results["edge_cases"],
+                "reasoning_steps": parsed_results["reasoning_steps"],
+                "tool_calls": parsed_results["tool_calls"],
+                "quality_improvement": quality_improvement,
+                "reasoning_trace": result if validated_task.get("return_analysis", True) else None
+            }
+
+        except Exception as e:
+            self.logger.error(f"ReAct reasoning failed: {e}")
+            return await self._fallback_to_standard_generation(task, e)
+
+    async def _validate_and_prepare_task(self, task: QETask) -> Dict[str, Any]:
+        """Validate task inputs and prepare code content
+
+        Args:
+            task: QETask with context containing code or file_path
+
+        Returns:
+            Dictionary with validated task parameters
+
+        Raises:
+            ValueError: If neither code nor file_path provided
+        """
         context = task.context
         code = context.get("code", "")
         file_path = context.get("file_path")
@@ -531,21 +593,73 @@ Generate tests one at a time, each as a complete GeneratedTest object in JSON fo
 
         self.logger.info(f"Starting ReAct reasoning for {test_type} test generation")
 
+        return {
+            "code": code,
+            "framework": framework,
+            "test_type": test_type,
+            "coverage_target": coverage_target,
+            "return_analysis": True
+        }
+
+    async def _initialize_react_components(
+        self, validated_task: Dict[str, Any], max_reasoning_steps: int
+    ) -> tuple:
+        """Initialize ReAct tools, context, and instruction
+
+        Args:
+            validated_task: Validated task parameters
+            max_reasoning_steps: Maximum reasoning iterations
+
+        Returns:
+            Tuple of (tools, react_context, instruction)
+        """
+        code = validated_task["code"]
+        framework = validated_task["framework"]
+        test_type = validated_task["test_type"]
+        coverage_target = validated_task["coverage_target"]
+
         # Register tools for ReAct to use
         code_analyzer = CodeAnalyzerTool()
         ast_parser = ASTParserTool()
-
-        # Create function tools that ReAct can call
-        # Tools can be passed as raw callables or wrapped in Tool objects
-        tools = [
-            code_analyzer.analyze_code,  # Pass raw callable
-            ast_parser.detect_edge_cases  # Pass raw callable
-        ]
+        tools = [code_analyzer.analyze_code, ast_parser.detect_edge_cases]
 
         # Retrieve learned patterns
         learned_patterns = await self.get_learned_patterns()
 
-        # Build ReAct instruction with detailed guidance
+        # Build ReAct instruction
+        instruction = self._build_react_instruction(
+            code, framework, test_type, coverage_target, learned_patterns
+        )
+
+        # Build context
+        react_context = {
+            "code": code,
+            "framework": framework,
+            "test_type": test_type,
+            "coverage_target": coverage_target,
+        }
+
+        if learned_patterns:
+            react_context["learned_patterns"] = learned_patterns
+
+        return tools, react_context, instruction
+
+    def _build_react_instruction(
+        self, code: str, framework: str, test_type: str,
+        coverage_target: int, learned_patterns: Optional[Dict] = None
+    ) -> str:
+        """Build detailed ReAct instruction for test generation
+
+        Args:
+            code: Source code to test
+            framework: Test framework
+            test_type: Type of test
+            coverage_target: Target coverage percentage
+            learned_patterns: Previously learned patterns
+
+        Returns:
+            Formatted instruction string
+        """
         instruction = f"""Design and generate a comprehensive {test_type} test suite for the given code using {framework}.
 
 **Your Task:**
@@ -582,163 +696,237 @@ Generate tests one at a time, each as a complete GeneratedTest object in JSON fo
 
 Think step-by-step and use the tools to inform your test design."""
 
-        # Add learned patterns to context if available
-        react_context = {
-            "code": code,
-            "framework": framework,
-            "test_type": test_type,
-            "coverage_target": coverage_target,
-        }
-
         if learned_patterns:
-            react_context["learned_patterns"] = learned_patterns
             instruction += f"\n\n**Learned Patterns:**\n{json.dumps(learned_patterns, indent=2)}"
 
-        try:
-            # Execute ReAct reasoning loop
-            result = await self.branch.ReAct(
-                instruct={
-                    "instruction": instruction,
-                    "context": react_context,
-                    "guidance": (
-                        "Use the available tools to analyze the code before generating tests. "
-                        "Think through each step carefully. Identify scenarios and edge cases "
-                        "systematically. Generate comprehensive tests that cover all critical paths."
-                    )
-                },
-                tools=tools,
-                max_extensions=max_reasoning_steps,
-                extension_allowed=True,
-                verbose=verbose,
-                intermediate_response_options=[TestScenario, EdgeCase],
-                response_format=GeneratedTest,  # Final answer should be GeneratedTest
-                return_analysis=True,  # Get full reasoning trace
-                display_as="yaml"
-            )
+        return instruction
 
-            # Extract results from ReAct response
-            if isinstance(result, dict):
-                final_tests = result.get("response", result.get("final_answer"))
-                analysis = result.get("analysis", {})
-                reasoning_trace = result.get("trace", [])
+    async def _execute_react_reasoning(
+        self, instruction: str, react_context: Dict[str, Any],
+        tools: List, max_reasoning_steps: int, verbose: bool
+    ) -> Dict[str, Any]:
+        """Execute the ReAct reasoning loop
+
+        Args:
+            instruction: ReAct instruction
+            react_context: Context for reasoning
+            tools: List of tools for ReAct to use
+            max_reasoning_steps: Maximum iterations
+            verbose: Enable verbose logging
+
+        Returns:
+            ReAct result dictionary
+        """
+        result = await self.branch.ReAct(
+            instruct={
+                "instruction": instruction,
+                "context": react_context,
+                "guidance": (
+                    "Use the available tools to analyze the code before generating tests. "
+                    "Think through each step carefully. Identify scenarios and edge cases "
+                    "systematically. Generate comprehensive tests that cover all critical paths."
+                )
+            },
+            tools=tools,
+            max_extensions=max_reasoning_steps,
+            extension_allowed=True,
+            verbose=verbose,
+            intermediate_response_options=[TestScenario, EdgeCase],
+            response_format=GeneratedTest,
+            return_analysis=True,
+            display_as="yaml"
+        )
+
+        return result
+
+    async def _parse_reasoning_trace(self, result: Any) -> Dict[str, Any]:
+        """Parse intermediate deliverables from reasoning trace
+
+        Args:
+            result: ReAct result object
+
+        Returns:
+            Dictionary with parsed scenarios, edge_cases, reasoning_steps, tool_calls
+        """
+        # Extract results from ReAct response
+        reasoning_trace = []
+        if isinstance(result, dict):
+            reasoning_trace = result.get("trace", [])
+
+        scenarios = []
+        edge_cases = []
+        reasoning_steps = []
+        tool_calls = []
+
+        # Extract from trace if available
+        if reasoning_trace:
+            for step in reasoning_trace:
+                if isinstance(step, dict):
+                    # Extract reasoning text
+                    if "thought" in step or "reasoning" in step:
+                        reasoning_steps.append(step.get("thought") or step.get("reasoning"))
+
+                    # Extract tool calls
+                    if "action" in step or "tool_call" in step:
+                        tool_calls.append({
+                            "tool": step.get("action") or step.get("tool_call"),
+                            "input": step.get("action_input", {}),
+                            "output": step.get("observation", {})
+                        })
+
+                    # Extract intermediate responses
+                    if "intermediate" in step:
+                        intermediate = step["intermediate"]
+                        if isinstance(intermediate, TestScenario):
+                            scenarios.append(intermediate)
+                        elif isinstance(intermediate, EdgeCase):
+                            edge_cases.append(intermediate)
+
+        return {
+            "scenarios": scenarios,
+            "edge_cases": edge_cases,
+            "reasoning_steps": reasoning_steps,
+            "tool_calls": tool_calls
+        }
+
+    def _calculate_quality_improvement(
+        self, scenarios: List[TestScenario], edge_cases: List[EdgeCase]
+    ) -> float:
+        """Calculate quality improvement estimate based on identified scenarios and edge cases
+
+        Args:
+            scenarios: List of identified test scenarios
+            edge_cases: List of identified edge cases
+
+        Returns:
+            Quality improvement percentage
+        """
+        baseline_edge_cases = 2  # Typical without reasoning
+        baseline_scenarios = 3
+
+        edge_case_improvement = (len(edge_cases) - baseline_edge_cases) / baseline_edge_cases * 100
+        scenario_improvement = (len(scenarios) - baseline_scenarios) / baseline_scenarios * 100
+        quality_improvement = (edge_case_improvement + scenario_improvement) / 2
+
+        return quality_improvement
+
+    async def _ensure_valid_test_result(
+        self, result: Any, parsed_results: Dict[str, Any],
+        validated_task: Dict[str, Any]
+    ) -> GeneratedTest:
+        """Ensure final_tests is a valid GeneratedTest object
+
+        Args:
+            result: ReAct result
+            parsed_results: Parsed reasoning results
+            validated_task: Validated task parameters
+
+        Returns:
+            GeneratedTest object
+        """
+        # Extract final tests from result
+        final_tests = None
+        if isinstance(result, dict):
+            final_tests = result.get("response", result.get("final_answer"))
+        else:
+            final_tests = result
+
+        # Ensure it's a GeneratedTest object
+        if not isinstance(final_tests, GeneratedTest):
+            if isinstance(final_tests, dict):
+                final_tests = GeneratedTest(**final_tests)
             else:
-                final_tests = result
-                analysis = {}
-                reasoning_trace = []
-
-            # Parse intermediate deliverables from reasoning trace
-            scenarios = []
-            edge_cases = []
-            reasoning_steps = []
-            tool_calls = []
-
-            # Extract from trace if available
-            if reasoning_trace:
-                for step in reasoning_trace:
-                    if isinstance(step, dict):
-                        # Extract reasoning text
-                        if "thought" in step or "reasoning" in step:
-                            reasoning_steps.append(step.get("thought") or step.get("reasoning"))
-
-                        # Extract tool calls
-                        if "action" in step or "tool_call" in step:
-                            tool_calls.append({
-                                "tool": step.get("action") or step.get("tool_call"),
-                                "input": step.get("action_input", {}),
-                                "output": step.get("observation", {})
-                            })
-
-                        # Extract intermediate responses
-                        if "intermediate" in step:
-                            intermediate = step["intermediate"]
-                            if isinstance(intermediate, TestScenario):
-                                scenarios.append(intermediate)
-                            elif isinstance(intermediate, EdgeCase):
-                                edge_cases.append(intermediate)
-
-            # Calculate quality improvement estimate
-            # Base improvement on number of edge cases and scenarios identified
-            baseline_edge_cases = 2  # Typical without reasoning
-            baseline_scenarios = 3
-
-            edge_case_improvement = (len(edge_cases) - baseline_edge_cases) / baseline_edge_cases * 100
-            scenario_improvement = (len(scenarios) - baseline_scenarios) / baseline_scenarios * 100
-            quality_improvement = (edge_case_improvement + scenario_improvement) / 2
-
-            # Ensure final_tests is a GeneratedTest object
-            if not isinstance(final_tests, GeneratedTest):
-                if isinstance(final_tests, dict):
-                    final_tests = GeneratedTest(**final_tests)
-                else:
-                    # Fallback: create basic test object
-                    self.logger.warning("ReAct did not return GeneratedTest, creating fallback")
-                    final_tests = GeneratedTest(
-                        test_name=f"test_{test_type}",
-                        test_code="# Test generation incomplete",
-                        framework=framework,
-                        test_type=test_type,
-                        assertions=[],
-                        edge_cases=[ec.case_name for ec in edge_cases],
-                        dependencies=[],
-                        coverage_estimate=0.0
-                    )
-
-            # Store results in memory
-            await self.store_result(
-                f"reasoning/{task.task_id}",
-                {
-                    "scenarios": [s.model_dump() for s in scenarios],
-                    "edge_cases": [ec.model_dump() for ec in edge_cases],
-                    "tool_calls": tool_calls,
-                    "quality_improvement": quality_improvement
-                },
-                ttl=86400  # 24 hours
-            )
-
-            # Store pattern if quality improvement is significant
-            if quality_improvement > 20:  # 20%+ improvement
-                await self.store_learned_pattern(
-                    f"{framework}_{test_type}_react_pattern",
-                    {
-                        "framework": framework,
-                        "test_type": test_type,
-                        "pattern": "react_reasoning_high_quality",
-                        "quality_improvement": quality_improvement,
-                        "scenarios_count": len(scenarios),
-                        "edge_cases_count": len(edge_cases),
-                    }
+                # Fallback: create basic test object
+                self.logger.warning("ReAct did not return GeneratedTest, creating fallback")
+                final_tests = GeneratedTest(
+                    test_name=f"test_{validated_task['test_type']}",
+                    test_code="# Test generation incomplete",
+                    framework=validated_task["framework"],
+                    test_type=validated_task["test_type"],
+                    assertions=[],
+                    edge_cases=[ec.case_name for ec in parsed_results["edge_cases"]],
+                    dependencies=[],
+                    coverage_estimate=0.0
                 )
 
-            # Log results
-            if verbose:
-                self.logger.info(f"ReAct reasoning complete:")
-                self.logger.info(f"  - Scenarios identified: {len(scenarios)}")
-                self.logger.info(f"  - Edge cases identified: {len(edge_cases)}")
-                self.logger.info(f"  - Reasoning steps: {len(reasoning_steps)}")
-                self.logger.info(f"  - Tool calls: {len(tool_calls)}")
-                self.logger.info(f"  - Quality improvement: {quality_improvement:.1f}%")
+        return final_tests
 
-            return {
-                "final_tests": final_tests,
-                "scenarios_identified": scenarios,
-                "edge_cases_identified": edge_cases,
-                "reasoning_steps": reasoning_steps,
-                "tool_calls": tool_calls,
-                "quality_improvement": quality_improvement,
-                "reasoning_trace": result if return_analysis else None
-            }
+    async def _store_reasoning_results(
+        self, task: QETask, final_tests: GeneratedTest,
+        parsed_results: Dict[str, Any], quality_improvement: float,
+        validated_task: Dict[str, Any]
+    ) -> None:
+        """Store reasoning results and learned patterns in memory
 
-        except Exception as e:
-            self.logger.error(f"ReAct reasoning failed: {e}")
-            # Fallback to standard generation
-            self.logger.info("Falling back to standard test generation")
-            standard_result = await self.execute(task)
-            return {
-                "final_tests": standard_result,
-                "scenarios_identified": [],
-                "edge_cases_identified": [],
-                "reasoning_steps": [],
-                "tool_calls": [],
-                "quality_improvement": 0.0,
-                "error": str(e)
-            }
+        Args:
+            task: Original task
+            final_tests: Final generated tests
+            parsed_results: Parsed reasoning results
+            quality_improvement: Quality improvement percentage
+            validated_task: Validated task parameters
+        """
+        # Store results in memory
+        await self.store_result(
+            f"reasoning/{task.task_id}",
+            {
+                "scenarios": [s.model_dump() for s in parsed_results["scenarios"]],
+                "edge_cases": [ec.model_dump() for ec in parsed_results["edge_cases"]],
+                "tool_calls": parsed_results["tool_calls"],
+                "quality_improvement": quality_improvement
+            },
+            ttl=86400  # 24 hours
+        )
+
+        # Store pattern if quality improvement is significant
+        if quality_improvement > 20:  # 20%+ improvement
+            await self.store_learned_pattern(
+                f"{validated_task['framework']}_{validated_task['test_type']}_react_pattern",
+                {
+                    "framework": validated_task["framework"],
+                    "test_type": validated_task["test_type"],
+                    "pattern": "react_reasoning_high_quality",
+                    "quality_improvement": quality_improvement,
+                    "scenarios_count": len(parsed_results["scenarios"]),
+                    "edge_cases_count": len(parsed_results["edge_cases"]),
+                }
+            )
+
+    def _log_reasoning_results(
+        self, parsed_results: Dict[str, Any], quality_improvement: float
+    ) -> None:
+        """Log reasoning results if verbose mode enabled
+
+        Args:
+            parsed_results: Parsed reasoning results
+            quality_improvement: Quality improvement percentage
+        """
+        self.logger.info(f"ReAct reasoning complete:")
+        self.logger.info(f"  - Scenarios identified: {len(parsed_results['scenarios'])}")
+        self.logger.info(f"  - Edge cases identified: {len(parsed_results['edge_cases'])}")
+        self.logger.info(f"  - Reasoning steps: {len(parsed_results['reasoning_steps'])}")
+        self.logger.info(f"  - Tool calls: {len(parsed_results['tool_calls'])}")
+        self.logger.info(f"  - Quality improvement: {quality_improvement:.1f}%")
+
+    async def _fallback_to_standard_generation(
+        self, task: QETask, error: Exception
+    ) -> Dict[str, Any]:
+        """Fallback to standard test generation on error
+
+        Args:
+            task: Original task
+            error: Exception that occurred
+
+        Returns:
+            Result dictionary with standard generation
+        """
+        self.logger.info("Falling back to standard test generation")
+        standard_result = await self.execute(task)
+        return {
+            "final_tests": standard_result,
+            "scenarios_identified": [],
+            "edge_cases_identified": [],
+            "reasoning_steps": [],
+            "tool_calls": [],
+            "quality_improvement": 0.0,
+            "error": str(error)
+        }

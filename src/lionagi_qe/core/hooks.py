@@ -42,7 +42,9 @@ class QEHooks:
         self,
         fleet_id: str,
         cost_alert_threshold: float = 10.0,
-        enable_detailed_logging: bool = True
+        enable_detailed_logging: bool = True,
+        max_cost_per_minute: Optional[float] = None,
+        max_calls_per_minute: Optional[int] = None
     ):
         """Initialize QE hooks system
 
@@ -50,10 +52,16 @@ class QEHooks:
             fleet_id: Unique identifier for this fleet instance
             cost_alert_threshold: Dollar amount that triggers cost warnings
             enable_detailed_logging: Whether to log detailed information for each call
+            max_cost_per_minute: Maximum cost per minute (security: prevent cost explosion)
+            max_calls_per_minute: Maximum calls per minute (security: rate limiting)
         """
         self.fleet_id = fleet_id
         self.cost_alert_threshold = cost_alert_threshold
         self.enable_detailed_logging = enable_detailed_logging
+
+        # Security: Rate limiting parameters
+        self.max_cost_per_minute = max_cost_per_minute
+        self.max_calls_per_minute = max_calls_per_minute
 
         # Setup logging
         self.logger = logging.getLogger(f"qe_fleet.hooks.{fleet_id}")
@@ -83,6 +91,11 @@ class QEHooks:
         # Alert tracking
         self.alerts_triggered = []
 
+        # Security: Rate limit tracking (rolling window)
+        self.rate_limit_window_start = datetime.utcnow()
+        self.rate_limit_window_cost = 0.0
+        self.rate_limit_window_calls = 0
+
     async def pre_invocation_hook(self, event, **kwargs):
         """Hook called before each AI model invocation
 
@@ -95,8 +108,42 @@ class QEHooks:
         Args:
             event: Hook event containing invocation details
             **kwargs: Additional context passed to the hook
+
+        Raises:
+            RuntimeError: If rate limits are exceeded
         """
+        # Security: Check rate limits before allowing call
+        current_time = datetime.utcnow()
+        time_since_window_start = (current_time - self.rate_limit_window_start).total_seconds()
+
+        # Reset window if more than 60 seconds have passed
+        if time_since_window_start >= 60:
+            self.rate_limit_window_start = current_time
+            self.rate_limit_window_cost = 0.0
+            self.rate_limit_window_calls = 0
+
+        # Check call rate limit
+        if self.max_calls_per_minute is not None:
+            if self.rate_limit_window_calls >= self.max_calls_per_minute:
+                error_msg = (
+                    f"Rate limit exceeded: {self.rate_limit_window_calls} calls "
+                    f"in current minute (max: {self.max_calls_per_minute})"
+                )
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
+        # Check cost rate limit (will be updated in post_invocation)
+        if self.max_cost_per_minute is not None:
+            if self.rate_limit_window_cost >= self.max_cost_per_minute:
+                error_msg = (
+                    f"Cost rate limit exceeded: ${self.rate_limit_window_cost:.4f} "
+                    f"in current minute (max: ${self.max_cost_per_minute:.2f})"
+                )
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
         self.call_count += 1
+        self.rate_limit_window_calls += 1
 
         # Extract context
         context = kwargs.get('context', {})
@@ -174,6 +221,7 @@ class QEHooks:
 
         # Update cost trackers
         self.cost_tracker["total"] += cost
+        self.rate_limit_window_cost += cost  # Security: Track cost in rate limit window
 
         # Track by agent
         if agent_id not in self.cost_tracker["by_agent"]:
@@ -413,7 +461,18 @@ class QEHooks:
 
         Returns:
             Formatted metrics string
+
+        Raises:
+            ValueError: If format is not supported
         """
+        # Security: Validate format parameter
+        allowed_formats = {"json", "summary", "csv"}
+        if format not in allowed_formats:
+            raise ValueError(
+                f"Unsupported format: {format}. "
+                f"Allowed formats: {', '.join(sorted(allowed_formats))}"
+            )
+
         metrics = self.get_metrics()
 
         if format == "json":

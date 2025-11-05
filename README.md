@@ -232,22 +232,33 @@ result = await fleet.execute_workflow(builder.get_graph())
 ## 📚 Documentation
 
 ### Getting Started
-- [Quick Start Guide](docs/QUICK_START.md)
-- [Architecture Guide](docs/LIONAGI_QE_FLEET_ARCHITECTURE.md)
-- [Migration Guide](docs/MIGRATION_GUIDE.md)
+- [Quick Start Guide](docs/quickstart/index.md)
+- [Installation Guide](docs/quickstart/installation.md)
+- [Your First Agent](docs/quickstart/your-first-agent.md)
+- [Troubleshooting](docs/quickstart/troubleshooting.md)
 - [Examples](examples/)
 
+### Core Documentation
+- [Architecture Guide](docs/architecture/system-overview.md)
+- [Migration Guide](docs/guides/migration.md)
+- [Agent Catalog](docs/agents/index.md)
+- [API Reference](docs/reference/index.md)
+
 ### Advanced Features
-- [Advanced Features Migration Guide](docs/ADVANCED_FEATURES_MIGRATION_GUIDE.md)
-- [ReAct Integration Summary](docs/REACT_INTEGRATION_SUMMARY.md)
-- [alcall Integration Report](docs/ALCALL_INTEGRATION_REPORT.md)
-- [Hooks System Guide](docs/HOOKS_SYSTEM_GUIDE.md)
-- [Streaming Implementation](docs/STREAMING_IMPLEMENTATION_REPORT.md)
+- [Advanced Features Migration Guide](docs/guides/advanced-features-migration.md)
+- [Hooks System Guide](docs/advanced/hooks-system.md)
+- [MCP Integration](docs/advanced/mcp-integration.md)
+- [Claude Code Integration](docs/advanced/claude-code-integration.md)
+
+### Reports & Analysis
+- [ReAct Integration](docs/reports/react-integration.md)
+- [alcall Integration](docs/reports/alcall-integration.md)
+- [Streaming Implementation](docs/reports/streaming-implementation.md)
+- [Security Fixes](docs/reports/security-fixes.md)
+- [Refactoring Report](docs/reports/refactoring.md)
 
 ### Security & Quality
 - [Security Policy](SECURITY.md) - Vulnerability reporting and best practices
-- [Security Fix Report](docs/SECURITY_FIX_REPORT.md) - Detailed security analysis
-- [Refactoring Report](docs/REFACTORING_REPORT.md) - Code complexity improvements
 - [Changelog](CHANGELOG.md) - Version history and release notes
 
 ## 🧪 Testing
@@ -286,9 +297,9 @@ Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE
 
 ## 💬 Support
 
-- **Documentation**: [Full documentation](docs/)
+- **Documentation**: [Full documentation](docs/index.md)
 - **Examples**: [Example workflows](examples/)
-- **FAQ**: [Frequently asked questions](docs/QUICK_START.md)
+- **FAQ**: [Frequently asked questions](docs/quickstart/troubleshooting.md)
 - **Issues**: [Search existing issues](https://github.com/lionagi/lionagi-qe-fleet/issues)
 
 ## 🔒 Security

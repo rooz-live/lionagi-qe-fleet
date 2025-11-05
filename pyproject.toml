@@ -35,13 +35,6 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-[project.urls]
-Homepage = "https://github.com/lionagi/lionagi-qe-fleet"
-Documentation = "https://github.com/lionagi/lionagi-qe-fleet/tree/main/docs"
-Repository = "https://github.com/lionagi/lionagi-qe-fleet"
-Issues = "https://github.com/lionagi/lionagi-qe-fleet/issues"
-Changelog = "https://github.com/lionagi/lionagi-qe-fleet/blob/main/CHANGELOG.md"
-"Source Code" = "https://github.com/lionagi/lionagi-qe-fleet"
 dependencies = [
     "lionagi>=0.18.2",
     "pydantic>=2.8.0",
@@ -55,6 +48,14 @@ dependencies = [
     "aiohttp>=3.9.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/lionagi/lionagi-qe-fleet"
+Documentation = "https://github.com/lionagi/lionagi-qe-fleet/tree/main/docs"
+Repository = "https://github.com/lionagi/lionagi-qe-fleet"
+Issues = "https://github.com/lionagi/lionagi-qe-fleet/issues"
+Changelog = "https://github.com/lionagi/lionagi-qe-fleet/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/lionagi/lionagi-qe-fleet"
 
 [project.optional-dependencies]
 dev = [

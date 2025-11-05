@@ -273,7 +273,7 @@ lionagi-qe-fleet/
 - ✅ Streaming support for long operations
 - ✅ Fleet orchestration (pipeline, parallel, fan-out-fan-in)
 - ✅ Shared memory coordination
-- ✅ Multi-model routing (70-81% cost savings)
+- ✅ Multi-model routing (up to 80% theoretical cost savings)
 - ✅ Q-learning integration (optional)
 
 ### 2. Claude Code Compatibility

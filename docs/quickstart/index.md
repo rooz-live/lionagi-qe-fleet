@@ -85,7 +85,7 @@ Ready to dive deeper? Choose your path:
 3. [Basic Workflows](basic-workflows.md) - Common patterns
 
 ### For Advanced Users
-- [Agent Catalog](../agents/index.md) - Explore all 19 agents
+- [Agent Catalog](../agents/index.md) - Explore all 18 agents
 - [Workflow Patterns](../patterns/index.md) - Advanced coordination patterns
 - [System Architecture](../architecture/system-overview.md) - Technical deep dive
 

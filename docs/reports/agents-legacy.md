@@ -36,7 +36,7 @@ Complete catalog of all 18 specialized QE agents in the LionAGI QE Fleet.
 
 **Capabilities**:
 - Multi-framework execution
-- Parallel test execution (10,000+ concurrent)
+- Parallel test execution (parallel async operations)
 - Coverage reporting
 - Failure analysis
 - Performance metrics
@@ -370,7 +370,7 @@ Multi-model routing automatically selects optimal models:
 - **Complex tasks** → GPT-4 ($0.0048)
 - **Critical tasks** → Claude Sonnet 4.5 ($0.0065)
 
-**Result**: 70-81% cost savings
+**Result**: up to 80% theoretical cost savings
 
 ---
 

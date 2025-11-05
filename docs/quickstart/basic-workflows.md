@@ -329,7 +329,7 @@ previous_results = await fleet.memory.retrieve("aqe/test-gen/results")
 ### 3. Use Routing for Cost Optimization
 ```python
 # Enable routing to use cheaper models for simple tasks
-fleet = QEFleet(enable_routing=True)  # 70-81% cost savings
+fleet = QEFleet(enable_routing=True)  # up to 80% theoretical cost savings
 ```
 
 ### 4. Monitor Fleet Status
@@ -364,4 +364,4 @@ python examples/04_fan_out_fan_in.py
 
 ---
 
-**Next**: [Agent Catalog](../agents/index.md) - Explore all 19 specialized agents →
+**Next**: [Agent Catalog](../agents/index.md) - Explore all 18 specialized agents →

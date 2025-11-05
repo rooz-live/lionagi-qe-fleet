@@ -308,7 +308,7 @@ result2 = await fleet.execute("agent2", task)
 model = iModel(provider="openai", model="gpt-4")  # $0.0048 per call
 
 # Good: Let routing optimize
-fleet = QEFleet(enable_routing=True)  # 70-81% savings
+fleet = QEFleet(enable_routing=True)  # up to 80% theoretical savings
 ```
 
 ## Next Steps

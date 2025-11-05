@@ -33,7 +33,7 @@ The MCP integration enables seamless interaction between Claude Code and the Lio
          ↓
 ┌─────────────────┐
 │  QE Fleet       │
-│  (19 Agents)    │
+│  (18 Agents)    │
 └─────────────────┘
          │
          ↓
@@ -49,7 +49,7 @@ The MCP integration enables seamless interaction between Claude Code and the Lio
 - **Streaming Support**: Real-time progress for long operations
 - **Fleet Orchestration**: Multi-agent workflows
 - **Shared Memory**: Cross-agent coordination via `aqe/*` namespace
-- **Multi-Model Routing**: 70-81% cost savings (optional)
+- **Multi-Model Routing**: up to 80% theoretical cost savings (optional)
 - **Q-Learning**: Pattern learning from executions (optional)
 
 ## Installation

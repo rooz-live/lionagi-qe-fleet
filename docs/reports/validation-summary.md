@@ -59,7 +59,7 @@
 ```bash
 # Option A: Update README (1 hour)
 sed -i 's/19 specialized/18 specialized/g' README.md
-sed -i 's/19 Specialized Agents/18 Specialized Agents/g' README.md
+sed -i 's/18 Specialized Agents/18 Specialized Agents/g' README.md
 
 # Option B: Implement 19th agent (1 week)
 # Create src/lionagi_qe/agents/base_template_generator.py
@@ -104,7 +104,7 @@ cd /workspaces/lionagi/lionagi-qe-fleet
 
 # Fix agent count
 sed -i 's/19 specialized AI agents/18 specialized AI agents/g' README.md
-sed -i 's/19 Specialized Agents/18 Specialized Agents/g' README.md
+sed -i 's/18 Specialized Agents/18 Specialized Agents/g' README.md
 
 # Fix test count
 sed -i 's/175+/44+/g' README.md

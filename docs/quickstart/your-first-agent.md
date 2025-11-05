@@ -174,7 +174,7 @@ fleet = QEFleet(enable_routing=True)
 await fleet.initialize()
 ```
 - Creates a fleet to manage agents
-- `enable_routing=True` enables intelligent model selection (70-81% cost savings)
+- `enable_routing=True` enables intelligent model selection (up to 80% theoretical cost savings)
 
 ### Model Creation
 ```python

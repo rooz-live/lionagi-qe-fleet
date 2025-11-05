@@ -1,13 +1,13 @@
 # Agent Catalog
 
-Complete catalog of all 19 specialized QE agents in the LionAGI QE Fleet.
+Complete catalog of all 18 specialized QE agents in the LionAGI QE Fleet.
 
 ## Quick Reference
 
 | Agent | Purpose | Key Capability |
 |-------|---------|----------------|
 | [TestGeneratorAgent](#testgeneratoragent) | Generate tests | AI-powered edge case detection |
-| [TestExecutorAgent](#testexecutoragent) | Execute tests | 10,000+ concurrent tests |
+| [TestExecutorAgent](#testexecutoragent) | Execute tests | Parallel async execution |
 | [CoverageAnalyzerAgent](#coverageanalyzeragent) | Analyze coverage | O(log n) gap detection |
 | [QualityGateAgent](#qualitygateagent) | Quality decisions | Multi-factor risk assessment |
 | [QualityAnalyzerAgent](#qualityanalyzeragent) | Quality metrics | Predictive analytics |
@@ -87,7 +87,7 @@ result = await fleet.execute("test-gen", QETask(
 
 **Capabilities**:
 - Multi-framework execution (pytest, Jest, Mocha, Cypress)
-- Parallel test execution (10,000+ concurrent)
+- Parallel test execution with async operations
 - Coverage reporting (line, branch, function)
 - Failure analysis and categorization
 - Performance metrics (duration, memory)
@@ -500,7 +500,7 @@ Agents automatically use optimal models via routing:
 - **Complex tasks** → GPT-4 ($0.0048)
 - **Critical tasks** → Claude Sonnet 4.5 ($0.0065)
 
-**Result**: 70-81% cost savings
+**Result**: up to 80% theoretical cost savings
 
 Enable routing:
 ```python
@@ -516,4 +516,4 @@ fleet = QEFleet(enable_routing=True)
 
 ---
 
-**Total Fleet Capacity**: 19 specialized agents ready for comprehensive quality engineering
+**Total Fleet Capacity**: 18 specialized agents ready for comprehensive quality engineering

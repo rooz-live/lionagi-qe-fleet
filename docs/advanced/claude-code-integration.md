@@ -10,7 +10,7 @@ LionAGI QE Fleet is now fully integrated with Claude Code through the Model Cont
 - ✅ **Streaming Progress** - Real-time updates for long operations
 - ✅ **Fleet Orchestration** - Multi-agent workflows (pipeline, parallel, fan-out-fan-in)
 - ✅ **Shared Memory** - Cross-agent coordination via `aqe/*` namespace
-- ✅ **Multi-Model Routing** - 70-81% cost savings (optional)
+- ✅ **Multi-Model Routing** - up to 80% theoretical cost savings (optional)
 - ✅ **Q-Learning** - Pattern learning from executions (optional)
 
 ## Quick Start
@@ -261,7 +261,7 @@ Edit `mcp_config.json`:
 ### Environment Variables
 
 ```bash
-# Enable multi-model routing (70-81% cost savings)
+# Enable multi-model routing (up to 80% theoretical cost savings)
 export AQE_ROUTING_ENABLED=true
 
 # Enable Q-learning

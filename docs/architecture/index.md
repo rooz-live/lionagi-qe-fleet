@@ -18,11 +18,11 @@ The LionAGI QE Fleet is built on a layered architecture that enables observable,
 │            Orchestration Layer (QEFleet)                 │
 │  - Workflow patterns (sequential, parallel, fan-out)    │
 │  - Agent coordination and lifecycle management          │
-│  - Multi-model routing (70-81% cost savings)            │
+│  - Multi-model routing (up to 80% theoretical cost savings)            │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│              Agent Layer (19 Specialized Agents)         │
+│              Agent Layer (18 Specialized Agents)         │
 │  Core Testing | Performance & Security | Strategic      │
 │  Advanced Testing | Specialized Agents                  │
 └─────────────────────────────────────────────────────────┘
@@ -55,7 +55,7 @@ The LionAGI QE Fleet is built on a layered architecture that enables observable,
 
 ### 2. Specialized Agents Over General Purpose
 
-**Decision**: 19 specialized agents with focused expertise
+**Decision**: 18 specialized agents with focused expertise
 
 **Rationale**:
 - Expertise: Each agent masters a specific domain
@@ -100,7 +100,7 @@ The LionAGI QE Fleet is built on a layered architecture that enables observable,
 **Decision**: Intelligent model selection based on task complexity
 
 **Rationale**:
-- Cost: 70-81% savings by using cheaper models for simple tasks
+- Cost: up to 80% theoretical savings by using cheaper models for simple tasks
 - Quality: Use powerful models only when needed
 - Flexibility: Add new models without code changes
 - Optimization: Automatic selection removes manual decision
@@ -311,7 +311,7 @@ coverage = CoverageAnalyzerAgent(
 
 ```python
 # Use cheaper models for simple tasks
-fleet = QEFleet(enable_routing=True)  # 70-81% cost savings
+fleet = QEFleet(enable_routing=True)  # up to 80% theoretical cost savings
 ```
 
 ---

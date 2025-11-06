@@ -84,3 +84,4 @@ cython_debug/
 .claude/
 .claude-flow/
 .swarm/
+src/lionagi_qe/__pycache__/

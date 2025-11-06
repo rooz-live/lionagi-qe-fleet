@@ -5,7 +5,34 @@ All notable changes to the LionAGI QE Fleet project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - Unreleased (In Development)
+## [1.1.1] - 2025-11-06
+
+### Fixed
+- **CodeComplexityAnalyzerAgent**: Fixed AttributeError when accessing config.agent_id
+  - Changed all references from `self.config.agent_id` to `self.agent_id`
+  - Affected lines: 182, 257, 269, 279 in `code_complexity.py`
+  - Resolves: "AttributeError: 'CodeComplexityAnalyzerAgent' object has no attribute 'config'"
+
+- **QualityGateAgent**: Added backward-compatible `quality_score` property
+  - QualityGateDecision model now has both `score` and `quality_score` attributes
+  - `quality_score` is a property that returns `score` value
+  - Resolves: "AttributeError: 'QualityGateDecision' object has no attribute 'quality_score'"
+  - Maintains 100% backward compatibility with existing code
+
+### Documented
+- **Anthropic API Issue**: Documented LionAGI core bug with missing max_tokens parameter
+  - Created comprehensive guide: `docs/known-issues/ANTHROPIC_MAX_TOKENS.md`
+  - Documented root cause in LionAGI's `anthropic_models.py`
+  - Provided workaround: Use OpenAI provider until LionAGI fixes issue
+  - Included 3 potential fixes for LionAGI maintainers
+  - Status: Not a lionagi-qe-fleet bug, issue tracked in LionAGI core
+
+### Testing
+- Verified QualityGateDecision property fix with direct tests
+- Confirmed all CodeComplexityAnalyzerAgent paths use self.agent_id
+- Both fixes tested and validated
+
+## [1.1.0] - 2025-11-05
 
 ### Added
 

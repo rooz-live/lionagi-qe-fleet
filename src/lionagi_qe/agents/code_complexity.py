@@ -179,7 +179,7 @@ This agent demonstrates:
 
         # Retrieve historical analysis for pattern learning
         historical_analyses = await self.get_memory(
-            f"aqe/complexity/{self.config.agent_id}/history",
+            f"aqe/complexity/{self.agent_id}/history",
             default=[]
         )
 
@@ -254,7 +254,7 @@ Output Format:
 
         # Store analysis results for coordination
         await self.store_memory(
-            f"aqe/complexity/{self.config.agent_id}/latest-result",
+            f"aqe/complexity/{self.agent_id}/latest-result",
             {
                 "score": result.score,
                 "issues_count": len(result.issues),
@@ -266,7 +266,7 @@ Output Format:
 
         # Append to historical analyses (keep last 100)
         current_history = await self.get_memory(
-            f"aqe/complexity/{self.config.agent_id}/history",
+            f"aqe/complexity/{self.agent_id}/history",
             default=[]
         )
         current_history.append({
@@ -276,7 +276,7 @@ Output Format:
             "issues_found": len(result.issues),
         })
         await self.store_memory(
-            f"aqe/complexity/{self.config.agent_id}/history",
+            f"aqe/complexity/{self.agent_id}/history",
             current_history[-100:]  # Keep last 100 analyses
         )
 

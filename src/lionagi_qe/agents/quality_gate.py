@@ -60,6 +60,11 @@ class QualityGateDecision(BaseModel):
     justification: str = Field(..., description="Decision justification")
     next_steps: List[str] = Field(..., description="Recommended next steps")
 
+    @property
+    def quality_score(self) -> float:
+        """Alias for 'score' attribute for backward compatibility"""
+        return self.score
+
 
 class QualityGateAgent(BaseQEAgent):
     """Intelligent quality gate with risk assessment and policy validation

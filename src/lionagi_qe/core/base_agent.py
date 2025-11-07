@@ -264,16 +264,16 @@ class BaseQEAgent(ABC):
                 from lionagi import Session
                 if not hasattr(self, '_session'):
                     self._session = Session()
-                return self._session.context
+                return self._session.content
 
             else:
                 raise ValueError(f"Unknown memory backend type: {backend_type}")
 
-        # Case 3: Default to Session.context
+        # Case 3: Default to Session.content (LionAGI v0.18.2+)
         from lionagi import Session
         if not hasattr(self, '_session'):
             self._session = Session()
-        return self._session.context
+        return self._session.content
 
     @property
     def memory_backend_type(self) -> str:

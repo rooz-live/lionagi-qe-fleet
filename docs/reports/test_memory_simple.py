@@ -28,9 +28,9 @@ class MockRedisMemory:
 
 
 class MockSession:
-    """Mock Session for testing"""
+    """Mock Session for testing (LionAGI v0.18.2+)"""
     def __init__(self):
-        self.context = {"type": "session_context"}
+        self.content = {"type": "session_content"}
 
 
 # Simplified agent for testing initialization logic only
@@ -85,15 +85,15 @@ class TestBaseQEAgent:
             elif backend_type == "session":
                 if not hasattr(self, '_session'):
                     self._session = MockSession()
-                return self._session.context
+                return self._session.content
 
             else:
                 raise ValueError(f"Unknown memory backend type: {backend_type}")
 
-        # Case 3: Default to Session.context
+        # Case 3: Default to Session.content (LionAGI v0.18.2+)
         if not hasattr(self, '_session'):
             self._session = MockSession()
-        return self._session.context
+        return self._session.content
 
     @property
     def memory_backend_type(self) -> str:
@@ -106,7 +106,7 @@ class TestBaseQEAgent:
                 return "redis"
             elif class_name == "MockQEMemory":
                 return "qememory"
-            elif isinstance(self.memory, dict) and self.memory.get("type") == "session_context":
+            elif isinstance(self.memory, dict) and self.memory.get("type") == "session_content":
                 return "session"
         return "custom"
 
@@ -135,16 +135,16 @@ def test_qememory_backward_compat():
     print(f"   Backend type: {agent.memory_backend_type}")
 
 
-def test_default_session_context():
-    """Test 2: Default Session.context"""
-    print("\n=== Test 2: Default Session.context ===")
+def test_default_session_content():
+    """Test 2: Default Session.content"""
+    print("\n=== Test 2: Default Session.content ===")
 
-    # No memory provided - should default to Session.context
+    # No memory provided - should default to Session.content
     agent = TestBaseQEAgent(agent_id="test-default")
 
     assert agent.memory is not None, "Memory should be initialized"
     assert agent.memory_backend_type == "session"
-    print(f"✅ Default Session.context works")
+    print(f"✅ Default Session.content works")
     print(f"   Backend type: {agent.memory_backend_type}")
 
 
@@ -271,7 +271,7 @@ def main():
 
     tests = [
         test_qememory_backward_compat,
-        test_default_session_context,
+        test_default_session_content,
         test_memory_config_session,
         test_memory_config_postgres,
         test_memory_config_redis,

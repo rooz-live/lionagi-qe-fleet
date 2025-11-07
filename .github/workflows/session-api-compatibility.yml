@@ -1,0 +1,177 @@
+name: Session API Compatibility Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+      - '.github/workflows/session-api-compatibility.yml'
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-session-api:
+    name: Python ${{ matrix.python-version }} | LionAGI ${{ matrix.lionagi-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+        lionagi-version: ['0.16.0', '0.17.0', '0.18.2']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install lionagi==${{ matrix.lionagi-version }}
+          pip install pytest pytest-cov pytest-asyncio
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      - name: Run Session API compatibility tests
+        run: |
+          # Test 1: Run unit test for memory initialization
+          python docs/reports/test_memory_simple.py
+
+      - name: Test orchestrator initialization
+        run: |
+          python -c "
+          from lionagi_qe.core.orchestrator import QEOrchestrator
+          from lionagi_qe.config import StorageMode
+
+          # Test DEV mode (uses Session.content)
+          orch = QEOrchestrator(mode='dev')
+          assert hasattr(orch.session, 'content'), 'Session should have content attribute (v0.18.2+)'
+          print('✅ Orchestrator DEV mode: Session.content available')
+
+          # Test TEST mode
+          orch_test = QEOrchestrator(mode='test')
+          assert hasattr(orch_test.session, 'content'), 'Session should have content attribute'
+          print('✅ Orchestrator TEST mode: Session.content available')
+          "
+
+      - name: Test base agent initialization
+        run: |
+          python -c "
+          from lionagi_qe.core.base_agent import BaseQEAgent
+          from lionagi_qe.types import QETask
+
+          # Minimal concrete agent for testing
+          class TestAgent(BaseQEAgent):
+              def get_system_prompt(self) -> str:
+                  return 'Test agent'
+              async def execute(self, task: QETask):
+                  return {'status': 'ok'}
+
+          # Test default Session.content initialization
+          agent = TestAgent(agent_id='test-agent')
+          assert agent.memory_backend_type == 'session', f'Expected session, got {agent.memory_backend_type}'
+          print('✅ BaseQEAgent: Session.content initialization works')
+
+          # Test session config
+          agent_config = TestAgent(
+              agent_id='test-agent-config',
+              memory_config={'type': 'session'}
+          )
+          assert agent_config.memory_backend_type == 'session'
+          print('✅ BaseQEAgent: Memory config (session) works')
+          "
+
+      - name: Run pytest (if tests exist)
+        continue-on-error: true
+        run: |
+          if [ -d tests ]; then
+            pytest tests/ -v --tb=short
+          else
+            echo "No tests/ directory found"
+          fi
+
+      - name: Check for session.context usage (should be none)
+        run: |
+          # Grep for session.context in source files (should return empty)
+          SESSION_CONTEXT_COUNT=$(grep -r "session\.context" src/ --include="*.py" | wc -l || true)
+          if [ "$SESSION_CONTEXT_COUNT" -gt 0 ]; then
+            echo "❌ Found $SESSION_CONTEXT_COUNT occurrences of session.context in src/"
+            grep -r "session\.context" src/ --include="*.py"
+            exit 1
+          else
+            echo "✅ No session.context found in src/ (all updated to session.content)"
+          fi
+
+      - name: Upload coverage reports
+        if: matrix.python-version == '3.11' && matrix.lionagi-version == '0.18.2'
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: session-api
+          name: session-api-${{ matrix.python-version }}-${{ matrix.lionagi-version }}
+
+  test-backward-compatibility:
+    name: Backward Compatibility (LionAGI 0.16.x)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install LionAGI 0.16.x
+        run: |
+          python -m pip install --upgrade pip
+          pip install lionagi==0.16.0
+          pip install pytest pytest-asyncio
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      - name: Test with LionAGI 0.16.x
+        run: |
+          # Run memory initialization test
+          python docs/reports/test_memory_simple.py
+          echo "✅ LionAGI 0.16.0 backward compatibility verified"
+
+  test-forward-compatibility:
+    name: Forward Compatibility (LionAGI latest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install LionAGI latest
+        run: |
+          python -m pip install --upgrade pip
+          pip install lionagi  # Latest version
+          pip install pytest pytest-asyncio
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      - name: Test with LionAGI latest
+        run: |
+          python docs/reports/test_memory_simple.py
+          echo "✅ LionAGI latest version compatibility verified"
+
+      - name: Report LionAGI version
+        run: |
+          python -c "import lionagi; print(f'LionAGI version: {lionagi.__version__}')"

@@ -9,6 +9,7 @@ from lionagi_qe.agents.test_generator import TestGeneratorAgent
 from lionagi_qe.agents.coverage_analyzer import CoverageAnalyzerAgent
 from lionagi_qe.core.task import QETask
 from lionagi_qe.core.memory import QEMemory
+from lionagi import iModel
 
 
 class MockStreamingModel:
@@ -56,7 +57,11 @@ def mock_memory():
 @pytest.fixture
 def test_generator_agent(mock_memory):
     """Create test generator agent with mock streaming model"""
-    model = MockStreamingModel()
+    # Create proper iModel instance
+    model = iModel(provider="openai", model="gpt-4", api_key="test-key")
+    # Mock the stream method
+    model.stream = MockStreamingModel().stream
+    
     agent = TestGeneratorAgent(
         agent_id="test-generator",
         model=model,
@@ -70,7 +75,8 @@ def test_generator_agent(mock_memory):
 @pytest.fixture
 def coverage_analyzer_agent(mock_memory):
     """Create coverage analyzer agent"""
-    model = Mock()
+    # Create proper iModel instance  
+    model = iModel(provider="openai", model="gpt-4", api_key="test-key")
     model.stream = AsyncMock()
 
     agent = CoverageAnalyzerAgent(

@@ -404,7 +404,13 @@ class WIPLimitedOrchestrator(BaseOrchestrator):
             run_agent_with_limits(agent_id, task_ctx)
             for agent_id, task_ctx in tasks_with_agents
         ]
-        results = await asyncio.gather(*coroutines)
+        # Use return_exceptions=True to ensure all coroutines complete and release semaphores
+        results = await asyncio.gather(*coroutines, return_exceptions=True)
+        
+        # Check for exceptions and re-raise first one found
+        for result in results:
+            if isinstance(result, Exception):
+                raise result
         
         self.metrics["total_agents_used"] += len(agent_ids)
         

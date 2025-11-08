@@ -441,7 +441,7 @@ class WIPLimitedOrchestrator(BaseOrchestrator):
         if high_contention:
             recommendations.append(
                 f"⚠️ High average wait time ({avg_wait:.0f}ms). "
-                "consider increasing WIP limits for current workload."
+                "increase WIP limits to reduce contention."
             )
         
         if not recommendations:
